@@ -4,6 +4,7 @@ using PriceTagPrint.View;
 using Reactive.Bindings;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -11,7 +12,7 @@ using static PriceTagPrint.Model.MainWindowModel;
 
 namespace PriceTagPrint.ViewModel
 {
-    public enum MenuKind { Auto, Input}
+    public enum MenuKind { Auto, Ryohan, Ippan, Other}
     class MainWindowViewModel : ViewModelsBase
     {
         public ReactiveProperty<MenuKind> SubMenuKind { get; set; } = new ReactiveProperty<MenuKind>(MenuKind.Auto);
@@ -20,7 +21,11 @@ namespace PriceTagPrint.ViewModel
 
         public ReactiveProperty<Visibility> AutoMenuVisibility { get; set; } = new ReactiveProperty<Visibility>(Visibility.Visible);
 
-        public ReactiveProperty<Visibility> InputMenuVisibility { get; set; } = new ReactiveProperty<Visibility>(Visibility.Hidden);
+        public ReactiveProperty<Visibility> RyohanMenuVisibility { get; set; } = new ReactiveProperty<Visibility>(Visibility.Hidden);
+
+        public ReactiveProperty<Visibility> IppanMenuVisibility { get; set; } = new ReactiveProperty<Visibility>(Visibility.Hidden);
+
+        public ReactiveProperty<Visibility> OtherMenuVisibility { get; set; } = new ReactiveProperty<Visibility>(Visibility.Hidden);
 
         public Window window;
         public double Number { get; set; }
@@ -41,24 +46,46 @@ namespace PriceTagPrint.ViewModel
             switch (kind)
             {
                 case MenuKind.Auto:
-                    InputMenuVisibility.Value = Visibility.Collapsed;
-                    AutoMenuVisibility.Value = Visibility.Visible;                    
+                    RyohanMenuVisibility.Value = Visibility.Collapsed;
+                    IppanMenuVisibility.Value = Visibility.Collapsed;
+                    OtherMenuVisibility.Value = Visibility.Collapsed;
+                    AutoMenuVisibility.Value = Visibility.Visible;
+                    
                     SubTitleText.Value = "自 動 発 行 メ ニ ュ ー";
                     break;
-                case MenuKind.Input:
+                case MenuKind.Ryohan:
                     AutoMenuVisibility.Value = Visibility.Collapsed;
-                    InputMenuVisibility.Value = Visibility.Visible;                    
-                    SubTitleText.Value = "手 動 発 行 メ ニ ュ ー";
+                    IppanMenuVisibility.Value = Visibility.Collapsed;
+                    OtherMenuVisibility.Value = Visibility.Collapsed;
+                    RyohanMenuVisibility.Value = Visibility.Visible;
+                    
+                    SubTitleText.Value = "量 販 店 手 動 発 行 メ ニ ュ ー";
+                    break;
+                case MenuKind.Ippan:
+                    AutoMenuVisibility.Value = Visibility.Collapsed;
+                    RyohanMenuVisibility.Value = Visibility.Collapsed;
+                    OtherMenuVisibility.Value = Visibility.Collapsed;
+                    IppanMenuVisibility.Value = Visibility.Visible;
+                    
+                    SubTitleText.Value = "一 般 店 手 動 発 行 メ ニ ュ ー";
+                    break;
+                case MenuKind.Other:
+                    AutoMenuVisibility.Value = Visibility.Collapsed;
+                    RyohanMenuVisibility.Value = Visibility.Collapsed;
+                    IppanMenuVisibility.Value = Visibility.Collapsed;
+                    OtherMenuVisibility.Value = Visibility.Visible;
+
+                    SubTitleText.Value = "そ の 他 手 動 発 行 メ ニ ュ ー";
                     break;
             }
         }
         private void ShowInputDisplay(string tcode)
         {
-            if (!RegistryUtil.isInstalled("Multi LABELIST V5"))
-            {
-                MessageBox.Show("Multi LABELIST V5がインストールされていません。", "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
+            //if (!RegistryUtil.isInstalled("Multi LABELIST V5"))
+            //{
+            //    MessageBox.Show("Multi LABELIST V5がインストールされていません。", "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
+            //    return;
+            //}
 
             var torihikisaki = Torihikisakis.list.FirstOrDefault(x => x.Tcode == tcode && x.Kind != HakkouKind.Auto);
             if (torihikisaki != null)
@@ -71,11 +98,26 @@ namespace PriceTagPrint.ViewModel
         }
         private void ShowAutoDisplay(string tcode)
         {
-            if (!RegistryUtil.isInstalled("Multi LABELIST V5"))
+            DirectoryInfo di = new DirectoryInfo(CommonStrings.CSV_PATH);
+            FileAttributes fas = File.GetAttributes(CommonStrings.CSV_PATH);
+
+            if (!di.Exists)
             {
-                MessageBox.Show("Multi LABELIST V5がインストールされていません。", "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
+                string msg = string.Format("CSV出力パス：{0}が存在しません。作成してください。", CommonStrings.CSV_PATH);
+                MessageBox.Show(msg, "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
+            else if((fas & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                string msg = string.Format("CSV出力パス：{0}が読み取り専用になっています。属性を変更してください。", CommonStrings.CSV_PATH);
+                MessageBox.Show(msg, "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            //if (!RegistryUtil.isInstalled("Multi LABELIST V5"))
+            //{
+            //    MessageBox.Show("Multi LABELIST V5がインストールされていません。", "起動時チェック", MessageBoxButton.OK, MessageBoxImage.Error);
+            //    return;
+            //}
 
             var torihikisaki = Torihikisakis.list.FirstOrDefault(x => x.Tcode == tcode && x.Kind != HakkouKind.Input);
             if(torihikisaki != null)
@@ -117,6 +159,54 @@ namespace PriceTagPrint.ViewModel
                     case Tid.WATASEI:
                         {
                             var view = new WataseiView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.KYOEI:
+                        {
+                            var view = new KyoueiView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.ITOGOFUKU:
+                        {
+                            var view = new ItougofukuView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.MANEKI:
+                        {
+                            var view = new ManekiView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.HOKKAIDO_SANKI:
+                        {
+                            var view = new HokaidoSankiView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.TENMAYA:
+                        {
+                            var view = new TenmayaView();
+                            view.Owner = window;
+                            view.Show();
+                            view.Owner.Hide();
+                        }
+                        break;
+                    case Tid.SANEI:
+                        {
+                            var view = new SaneiView();
                             view.Owner = window;
                             view.Show();
                             view.Owner.Hide();

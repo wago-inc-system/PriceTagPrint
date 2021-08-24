@@ -130,28 +130,49 @@ namespace PriceTagPrint.View
             {
                 case "Esc":
                     this.Close();
-                    var view = new MainWindow();
-                    view.Show();
+                    this.Owner.Show();
                     break;
                 case "F4":
                     ((YamanakaViewModel)this.DataContext).Clear();
+                    this.HakkouTypeText.Focus();
+                    this.HakkouTypeText.SelectAll();
                     break;
                 case "F5":
                     if (((YamanakaViewModel)this.DataContext).InputCheck())
                     {
                         ((YamanakaViewModel)this.DataContext).NefudaDataDisplay();
+                        this.HakkouTypeText.Focus();
+                        this.HakkouTypeText.SelectAll();
                     }
                     break;
                 case "F10":
                     if (((YamanakaViewModel)this.DataContext).PrintCheck())
                     {
-                        ((YamanakaViewModel)this.DataContext).ExecPrint(true);
+                        if (MessageBox.Show("値札の発行を行いますか？", "値札発行確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+                        {
+                            ((YamanakaViewModel)this.DataContext).ExecPrint(true);
+                            this.HakkouTypeText.Focus();
+                            this.HakkouTypeText.SelectAll();
+                        }  
+                    }
+                    else
+                    {
+                        MessageBox.Show("対象データが存在しません。", "値札発行エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     break;
                 case "F12":
                     if (((YamanakaViewModel)this.DataContext).PrintCheck())
                     {
-                        ((YamanakaViewModel)this.DataContext).ExecPrint(false);
+                        if (MessageBox.Show("値札の発行を行いますか？", "値札発行確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+                        {
+                            ((YamanakaViewModel)this.DataContext).ExecPrint(false);
+                            this.HakkouTypeText.Focus();
+                            this.HakkouTypeText.SelectAll();
+                        } 
+                    }
+                    else
+                    {
+                        MessageBox.Show("対象データが存在しません。", "値札発行エラー", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     break;
             }
@@ -211,6 +232,8 @@ namespace PriceTagPrint.View
                         int nefudaBangou;
                         ((YamanakaViewModel)this.DataContext).NefudaBangouText.Value = int.TryParse(this.NefudaBangouText.Text, out nefudaBangou) ? nefudaBangou : 0;
                         ((YamanakaViewModel)this.DataContext).NefudaDataDisplay();
+                        this.HakkouTypeText.Focus();
+                        this.HakkouTypeText.SelectAll();
                     }
                 }
             }
@@ -254,6 +277,7 @@ namespace PriceTagPrint.View
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine(ex.Message.ToString());
                     return;
                 }
 

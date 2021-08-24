@@ -18,6 +18,9 @@ using PriceTagPrint.Model;
 using PriceTagPrint.WAGO2;
 using PriceTagPrint.WAGO;
 using Reactive.Bindings;
+using PriceTagPrint.View;
+using System.ComponentModel;
+using System.Reactive.Linq;
 
 namespace PriceTagPrint.ViewModel
 {
@@ -116,11 +119,15 @@ namespace PriceTagPrint.ViewModel
                     break;
                 case "F4":
                     Clear();
+                    this.HakkouTypeTextBox.Focus();
+                    this.HakkouTypeTextBox.SelectAll();
                     break;
                 case "F5":
                     if (InputCheck())
                     {
                         NefudaDataDisplay();
+                        this.HakkouTypeTextBox.Focus();
+                        this.HakkouTypeTextBox.SelectAll();
                     }
                     break;
                 case "F10":
@@ -133,6 +140,8 @@ namespace PriceTagPrint.ViewModel
                     if (MessageBox.Show("値札の発行を行いますか？", "値札発行確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
                     {
                         ExecPrint(true);
+                        this.HakkouTypeTextBox.Focus();
+                        this.HakkouTypeTextBox.SelectAll();
                     }
                     break;
                 case "F12":
@@ -145,6 +154,8 @@ namespace PriceTagPrint.ViewModel
                     if (MessageBox.Show("値札の発行を行いますか？", "値札発行確認", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
                     {
                         ExecPrint(false);
+                        this.HakkouTypeTextBox.Focus();
+                        this.HakkouTypeTextBox.SelectAll();
                     }
                     break;
             }
@@ -157,33 +168,47 @@ namespace PriceTagPrint.ViewModel
         /// </summary>
         public OkinawaSankiViewModel()
         {
-            dB_0118_EOS_HACHU_LIST = new DB_0118_EOS_HACHU_LIST();
-            dB_0118_HACHUSYO_LIST = new DB_0118_HACHUSYO_LIST();
-            dB_0118_KAITUKESYO_LIST = new DB_0118_KAITUKESYO_LIST();
-            tOKMSTPF_LIST = new TOKMSTPF_LIST();
-            wEB_TORIHIKISAKI_TANKA_LIST = new WEB_TORIHIKISAKI_TANKA_LIST();
+            ProcessingSplash ps = new ProcessingSplash("起動中", () =>
+            {
+                dB_0118_EOS_HACHU_LIST = new DB_0118_EOS_HACHU_LIST();
+                dB_0118_HACHUSYO_LIST = new DB_0118_HACHUSYO_LIST();
+                dB_0118_KAITUKESYO_LIST = new DB_0118_KAITUKESYO_LIST();
+                tOKMSTPF_LIST = new TOKMSTPF_LIST();
+                wEB_TORIHIKISAKI_TANKA_LIST = new WEB_TORIHIKISAKI_TANKA_LIST();
 
-            CreateComboItems();
-            
-            // コンボボックス初期値セット
-            HakkouTypeText = new ReactiveProperty<int>(1);
-            CenterText = new ReactiveProperty<string>("");
-            HinbanCodeText = new ReactiveProperty<string>("");
-            NefudaBangouText = new ReactiveProperty<int>(1);
+                CreateComboItems();
 
-            // SubScribe定義
-            HakkouTypeText.Subscribe(x => HakkouTypeTextChanged(x));
-            CenterText.Subscribe(x => CenterTextChanged(x));
-            HinbanCodeText.Subscribe(x => HinbanCodeTextChanged(x));
-            NefudaBangouText.Subscribe(x => NefudaBangouTextChanged(x));
-            SelectedHakkouTypeIndex.Subscribe(x => SelectedHakkouTypeIndexChanged(x));
-            SelectedCenterIndex.Subscribe(x => SelectedCenterIndexChanged(x));
-            SelectedHinbanCodeIndex.Subscribe(x => SelectedHinbanCodeIndexChanged(x));
-            SelectedNefudaBangouIndex.Subscribe(x => SelectedNefudaBangouIndexChanged(x));
+                // コンボボックス初期値セット
+                HakkouTypeText = new ReactiveProperty<int>(1);
+                CenterText = new ReactiveProperty<string>("");
+                HinbanCodeText = new ReactiveProperty<string>("");
+                NefudaBangouText = new ReactiveProperty<int>(1);
 
-            HachuBangou.Subscribe(x => HachuBangouTextChanged(x));
+                // SubScribe定義
+                HakkouTypeText.Subscribe(x => HakkouTypeTextChanged(x));
+                CenterText.Subscribe(x => CenterTextChanged(x));
+                HinbanCodeText.Subscribe(x => HinbanCodeTextChanged(x));
+                NefudaBangouText.Subscribe(x => NefudaBangouTextChanged(x));
+                SelectedHakkouTypeIndex.Subscribe(x => SelectedHakkouTypeIndexChanged(x));
+                SelectedCenterIndex.Subscribe(x => SelectedCenterIndexChanged(x));
+                SelectedHinbanCodeIndex.Subscribe(x => SelectedHinbanCodeIndexChanged(x));
+                SelectedNefudaBangouIndex.Subscribe(x => SelectedNefudaBangouIndexChanged(x));
 
-            SelectedCenterIndex.Value = CenterItems.Value.Select((item, index) => new { item, index }).FirstOrDefault(x => x.item.Id == "5").index;
+                HachuBangou.Subscribe(x => HachuBangouTextChanged(x));
+
+                SelectedCenterIndex.Value = CenterItems.Value.Select((item, index) => new { item, index }).FirstOrDefault(x => x.item.Id == "5").index;
+            });
+            //バックグラウンド処理が終わるまで表示して待つ
+            ps.ShowDialog();
+
+            if (ps.complete)
+            {
+                //処理が成功した
+            }
+            else
+            {
+                //処理が失敗した
+            }
         }
 
         #endregion
@@ -634,280 +659,328 @@ namespace PriceTagPrint.ViewModel
         /// </summary>
         public void NefudaDataDisplay()
         {
-            var wWebTorihikisakiTankaList = wEB_TORIHIKISAKI_TANKA_LIST.QueryWhereTcodeTenpo(_TOKCD.ToString(), "9999");
-            var selectCenter = CenterItems.Value.FirstOrDefault(x => x.Id == CenterText.Value)?.Name.Split("：").ElementAtOrDefault(1) ?? "";
-            switch (HakkouTypeText.Value)
+            ProcessingSplash ps = new ProcessingSplash("データ作成中...", () =>
             {
-                case 1:
-                    if(dB0118EosHachuList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
-                    {
-                        OkinawaSankiDatas.Clear();
-                        OkinawaSankiDatas.AddRange(
-                            dB0118EosHachuList.Where(x => x.NSU > 0)
-                                .Join(
-                                       wWebTorihikisakiTankaList,
-                                       e => new
-                                       {
-                                           SCODE = int.Parse(e.SCODE),
-                                           BUNRUI = short.Parse(e.BUNRUI.ToString()),
-                                           SAIZUS = short.Parse(e.SAIZUS.ToString()),
-                                       },
-                                       w => new
-                                       {
-                                           SCODE = w.HCODE,
-                                           BUNRUI = w.BUNRUI,                                           
-                                           SAIZUS = w.SAIZU
-                                       },
-                                       (eos, tanka) => new
-                                       {
-                                           HNO = eos.HNO,
-                                           TOKCD = eos.TOKCD,
-                                           NEFUDA_KBN = string.IsNullOrEmpty(tanka.NEFUDA_KBN) ? "1" : tanka.NEFUDA_KBN,
-                                           CENTCD = eos.CENTCD,
-                                           HINBANCD = eos.HINBANCD,
-                                           CYUBUNCD = eos.CYUBUNCD,
-                                           BAIKA = eos.BAIKA,
-                                           SYOHINCD = eos.SYOHINCD,
-                                           BIKOU1 = tanka.BIKOU1,
-                                           HINCD = eos.HINCD,
-                                           NSU = eos.NSU,
-                                       })
-                                 .GroupBy(a => new
-                                 {
-                                     a.HNO,
-                                     a.TOKCD,
-                                     a.NEFUDA_KBN,
-                                     a.CENTCD,
-                                     a.HINBANCD,
-                                     a.CYUBUNCD,
-                                     a.BAIKA,
-                                     a.SYOHINCD,
-                                     a.BIKOU1,
-                                     a.HINCD,
-                                 })
-                                 .Select(g => new OkinawaSankiData
-                                 {
-                                     HNO = g.Key.HNO,
-                                     TOKCD = g.Key.TOKCD,
-                                     NEFUDA_KBN = g.Key.NEFUDA_KBN,
-                                     JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
-                                     EOS = " ",
-                                     CENTCD = g.Key.CENTCD,
-                                     HINBANCD = g.Key.HINBANCD,
-                                     CYUBUNCD = g.Key.CYUBUNCD,
-                                     BAIKA = g.Key.BAIKA,
-                                     SYOHINCD = g.Key.SYOHINCD,
-                                     BIKOU1 = g.Key.BIKOU1,
-                                     HINCD = g.Key.HINCD,
-                                     NSU = g.Sum(y => y.NSU),
-                                 })
-                                 .Where(x => x.NSU > 0 &&
-                                             x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
-                                             (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
-                                                x.CENTCD == selectCenter : true) &&
-                                             (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
-                                                x.HINBANCD == HinbanCodeText.Value : true))
-                                 .OrderBy(g => g.HNO)
-                                 .ThenBy(g => g.HINCD.Replace("-", ""))
-                             );
-
-                        if (OkinawaSankiItems.Value == null)
+                var wWebTorihikisakiTankaList = wEB_TORIHIKISAKI_TANKA_LIST.QueryWhereTcodeTenpo(_TOKCD.ToString(), "9999");
+                var selectCenter = CenterItems.Value.FirstOrDefault(x => x.Id == CenterText.Value)?.Name.Split("：").ElementAtOrDefault(1) ?? "";
+                switch (HakkouTypeText.Value)
+                {
+                    case 1:
+                        if (dB0118EosHachuList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
                         {
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
-                        }
-                        if (OkinawaSankiDatas.Any())
-                        {
-                            OkinawaSankiItems.Value.Clear();
-                            var OkinawaSankiModelList = new OkinawaSankiItemList();
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas));
-                            TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
-                        }
-                        else
-                        {
-                            MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    }
-                    else
-                    {
-                        MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    break;
-                case 2:
-                    if (dB0118HchusyoList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
-                    {
-                        OkinawaSankiDatas.Clear();
-                        OkinawaSankiDatas.AddRange(
-                            dB0118HchusyoList.Where(x => x.NSU > 0)
-                                .Join(
-                                       wWebTorihikisakiTankaList,
-                                       e => new
-                                       {
-                                           SCODE = int.Parse(e.SCODE),
-                                           BUNRUI = short.Parse(e.BUNRUI.ToString()),
-                                           SAIZUS = short.Parse(e.SAIZUS.ToString()),
-                                       },
-                                       w => new
-                                       {
-                                           SCODE = w.HCODE,
-                                           BUNRUI = w.BUNRUI,
-                                           SAIZUS = w.SAIZU
-                                       },
-                                       (eos, tanka) => new
-                                       {
-                                           HNO = eos.HNO,
-                                           TOKCD = eos.TOKCD,
-                                           NEFUDA_KBN = string.IsNullOrEmpty(tanka.NEFUDA_KBN) ? "1" : tanka.NEFUDA_KBN,
-                                           CENTCD = eos.CENTCD,
-                                           HINBANCD = eos.HINBANCD,
-                                           CYUBUNCD = eos.CYUBUNCD,
-                                           BAIKA = eos.BAIKA,
-                                           SYOHINCD = eos.SYOHINCD,
-                                           BIKOU1 = tanka.BIKOU1,
-                                           HINCD = eos.HINCD,
-                                           NSU = eos.NSU,
-                                       })
-                                 .GroupBy(a => new
-                                 {
-                                     a.HNO,
-                                     a.TOKCD,
-                                     a.NEFUDA_KBN,
-                                     a.CENTCD,
-                                     a.HINBANCD,
-                                     a.CYUBUNCD,
-                                     a.BAIKA,
-                                     a.SYOHINCD,
-                                     a.BIKOU1,
-                                     a.HINCD,
-                                 })
-                                 .Select(g => new OkinawaSankiData
-                                 {
-                                     HNO = g.Key.HNO,
-                                     TOKCD = g.Key.TOKCD,
-                                     NEFUDA_KBN = g.Key.NEFUDA_KBN,
-                                     JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
-                                     EOS = " ",
-                                     CENTCD = g.Key.CENTCD,
-                                     HINBANCD = g.Key.HINBANCD,
-                                     CYUBUNCD = g.Key.CYUBUNCD,
-                                     BAIKA = g.Key.BAIKA,
-                                     SYOHINCD = g.Key.SYOHINCD,
-                                     BIKOU1 = g.Key.BIKOU1,
-                                     HINCD = g.Key.HINCD,
-                                     NSU = g.Sum(y => y.NSU),
-                                 })
-                                 .Where(x => x.NSU > 0 &&
-                                             x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
-                                             (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
-                                                x.CENTCD == selectCenter : true) &&
-                                             (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
-                                                x.HINBANCD == HinbanCodeText.Value : true))
-                                 .OrderBy(g => g.HNO)
-                                 .ThenBy(g => g.HINCD.Replace("-", ""))
-                             );
-
-                        if (OkinawaSankiItems.Value == null)
-                        {
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
-                        }
-                        if (OkinawaSankiDatas.Any())
-                        {
-                            OkinawaSankiItems.Value.Clear();
-                            var OkinawaSankiModelList = new OkinawaSankiItemList();
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas));
-                            TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                            OkinawaSankiDatas.Clear();
+                            OkinawaSankiDatas.AddRange(
+                                dB0118EosHachuList.Where(x => x.NSU > 0)
+                                    .Join(
+                                           wWebTorihikisakiTankaList,
+                                           e => new
+                                           {
+                                               SCODE = int.Parse(e.SCODE),
+                                               BUNRUI = short.Parse(e.BUNRUI.ToString()),
+                                               SAIZUS = short.Parse(e.SAIZUS.ToString()),
+                                           },
+                                           w => new
+                                           {
+                                               SCODE = w.HCODE,
+                                               BUNRUI = w.BUNRUI,
+                                               SAIZUS = w.SAIZU
+                                           },
+                                           (eos, tanka) => new
+                                           {
+                                               HNO = eos.HNO,
+                                               TOKCD = eos.TOKCD,
+                                               NEFUDA_KBN = string.IsNullOrEmpty(tanka.NEFUDA_KBN) ||
+                                                            (!string.IsNullOrEmpty(tanka.NEFUDA_KBN) && tanka.NEFUDA_KBN != "2") ? "1" : tanka.NEFUDA_KBN,
+                                               CENTCD = eos.CENTCD,
+                                               HINBANCD = eos.HINBANCD,
+                                               CYUBUNCD = eos.CYUBUNCD,
+                                               BAIKA = eos.BAIKA,
+                                               SYOHINCD = eos.SYOHINCD,
+                                               BIKOU1 = tanka.BIKOU1,
+                                               HINCD = eos.HINCD,
+                                               NSU = eos.NSU,
+                                           })
+                                     .GroupBy(a => new
+                                     {
+                                         a.HNO,
+                                         a.TOKCD,
+                                         a.NEFUDA_KBN,
+                                         a.CENTCD,
+                                         a.HINBANCD,
+                                         a.CYUBUNCD,
+                                         a.BAIKA,
+                                         a.SYOHINCD,
+                                         a.BIKOU1,
+                                         a.HINCD,
+                                     })
+                                     .Select(g => new OkinawaSankiData
+                                     {
+                                         HNO = g.Key.HNO,
+                                         TOKCD = g.Key.TOKCD,
+                                         NEFUDA_KBN = g.Key.NEFUDA_KBN,
+                                         JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
+                                         EOS = " ",
+                                         CENTCD = g.Key.CENTCD,
+                                         HINBANCD = g.Key.HINBANCD,
+                                         CYUBUNCD = g.Key.CYUBUNCD,
+                                         BAIKA = g.Key.BAIKA,
+                                         SYOHINCD = g.Key.SYOHINCD,
+                                         BIKOU1 = g.Key.BIKOU1,
+                                         HINCD = g.Key.HINCD,
+                                         NSU = g.Sum(y => y.NSU),
+                                     })
+                                     .Where(x => x.NSU > 0 &&
+                                                 x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
+                                                 (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
+                                                    x.CENTCD == selectCenter : true) &&
+                                                 (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
+                                                    x.HINBANCD == HinbanCodeText.Value : true))
+                                     .OrderBy(g => g.HNO)
+                                     .ThenBy(g => g.HINCD.Replace("-", ""))
+                                 );
+                            
+                            if (OkinawaSankiDatas.Any())
+                            {
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
+                                var OkinawaSankiModelList = new OkinawaSankiItemList();
+                                var addItems = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas)).ToList();
+                                // 直接ObservableにAddするとなぜか落ちるためListをかます。
+                                var setItems = new List<OkinawaSankiItem>();
+                                addItems.ForEach(item =>
+                                {
+                                    Observable.FromEventPattern<PropertyChangedEventHandler, PropertyChangedEventArgs>(
+                                          h => item.PropertyChanged += h,
+                                          h => item.PropertyChanged -= h)
+                                          .Subscribe(e =>
+                                          {
+                                              // 発行枚数に変更があったら合計発行枚数も変更する
+                                              TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                                          });
+                                    setItems.Add(item);
+                                });
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(setItems);
+                                TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                            }
+                            else
+                            {
+                                MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
                         else
                         {
                             MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
-                    }
-                    else
-                    {
-                        MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    break;
-                case 3:
-                    if (dB0118KaitukesyoList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
-                    {
-                        OkinawaSankiDatas.Clear();
-                        OkinawaSankiDatas.AddRange(
-                            dB0118KaitukesyoList.Where(x => x.NSU > 0)
-                                .Select(kaituke => new
-                                       {
-                                           HNO = kaituke.HNO,
-                                           TOKCD = kaituke.TOKCD,
-                                           NEFUDA_KBN = "1",
-                                           CENTCD = kaituke.CENTCD,
-                                           HINBANCD = kaituke.HINBANCD,
-                                           CYUBUNCD = kaituke.CYUBUNCD,
-                                           BAIKA = kaituke.BAIKA,
-                                           SYOHINCD = kaituke.SYOHINCD,
-                                           BIKOU1 = " ",
-                                           HINCD = " ",
-                                           NSU = kaituke.NSU,
-                                       })
-                                 .GroupBy(a => new
-                                 {
-                                     a.HNO,
-                                     a.TOKCD,
-                                     a.NEFUDA_KBN,
-                                     a.CENTCD,
-                                     a.HINBANCD,
-                                     a.CYUBUNCD,
-                                     a.BAIKA,
-                                     a.SYOHINCD,
-                                     a.BIKOU1,
-                                     a.HINCD,
-                                 })
-                                 .Select(g => new OkinawaSankiData
-                                 {
-                                     HNO = g.Key.HNO,
-                                     TOKCD = g.Key.TOKCD,
-                                     NEFUDA_KBN = g.Key.NEFUDA_KBN,
-                                     JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
-                                     EOS = " ",
-                                     CENTCD = g.Key.CENTCD,
-                                     HINBANCD = g.Key.HINBANCD,
-                                     CYUBUNCD = g.Key.CYUBUNCD,
-                                     BAIKA = g.Key.BAIKA,
-                                     SYOHINCD = g.Key.SYOHINCD,
-                                     BIKOU1 = g.Key.BIKOU1,
-                                     HINCD = g.Key.HINCD,
-                                     NSU = g.Sum(y => y.NSU),
-                                 })
-                                 .Where(x => x.NSU > 0 &&
-                                             x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
-                                             (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
-                                                x.CENTCD == selectCenter : true) &&
-                                             (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
-                                                x.HINBANCD == HinbanCodeText.Value : true))
-                                 .OrderBy(g => g.HNO)
-                                 .ThenBy(g => g.SYOHINCD)
-                             );
+                        break;
+                    case 2:
+                        if (dB0118HchusyoList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
+                        {
+                            OkinawaSankiDatas.Clear();
+                            OkinawaSankiDatas.AddRange(
+                                dB0118HchusyoList.Where(x => x.NSU > 0)
+                                    .Join(
+                                           wWebTorihikisakiTankaList,
+                                           e => new
+                                           {
+                                               SCODE = int.Parse(e.SCODE),
+                                               BUNRUI = short.Parse(e.BUNRUI.ToString()),
+                                               SAIZUS = short.Parse(e.SAIZUS.ToString()),
+                                           },
+                                           w => new
+                                           {
+                                               SCODE = w.HCODE,
+                                               BUNRUI = w.BUNRUI,
+                                               SAIZUS = w.SAIZU
+                                           },
+                                           (eos, tanka) => new
+                                           {
+                                               HNO = eos.HNO,
+                                               TOKCD = eos.TOKCD,
+                                               NEFUDA_KBN = string.IsNullOrEmpty(tanka.NEFUDA_KBN) ||
+                                                            (!string.IsNullOrEmpty(tanka.NEFUDA_KBN) && tanka.NEFUDA_KBN != "2") ? "1" : tanka.NEFUDA_KBN,
+                                               CENTCD = eos.CENTCD,
+                                               HINBANCD = eos.HINBANCD,
+                                               CYUBUNCD = eos.CYUBUNCD,
+                                               BAIKA = eos.BAIKA,
+                                               SYOHINCD = eos.SYOHINCD,
+                                               BIKOU1 = tanka.BIKOU1,
+                                               HINCD = eos.HINCD,
+                                               NSU = eos.NSU,
+                                           })
+                                     .GroupBy(a => new
+                                     {
+                                         a.HNO,
+                                         a.TOKCD,
+                                         a.NEFUDA_KBN,
+                                         a.CENTCD,
+                                         a.HINBANCD,
+                                         a.CYUBUNCD,
+                                         a.BAIKA,
+                                         a.SYOHINCD,
+                                         a.BIKOU1,
+                                         a.HINCD,
+                                     })
+                                     .Select(g => new OkinawaSankiData
+                                     {
+                                         HNO = g.Key.HNO,
+                                         TOKCD = g.Key.TOKCD,
+                                         NEFUDA_KBN = g.Key.NEFUDA_KBN,
+                                         JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
+                                         EOS = " ",
+                                         CENTCD = g.Key.CENTCD,
+                                         HINBANCD = g.Key.HINBANCD,
+                                         CYUBUNCD = g.Key.CYUBUNCD,
+                                         BAIKA = g.Key.BAIKA,
+                                         SYOHINCD = g.Key.SYOHINCD,
+                                         BIKOU1 = g.Key.BIKOU1,
+                                         HINCD = g.Key.HINCD,
+                                         NSU = g.Sum(y => y.NSU),
+                                     })
+                                     .Where(x => x.NSU > 0 &&
+                                                 x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
+                                                 (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
+                                                    x.CENTCD == selectCenter : true) &&
+                                                 (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
+                                                    x.HINBANCD == HinbanCodeText.Value : true))
+                                     .OrderBy(g => g.HNO)
+                                     .ThenBy(g => g.HINCD.Replace("-", ""))
+                                 );
 
-                        if (OkinawaSankiItems.Value == null)
-                        {
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
-                        }
-                        if (OkinawaSankiDatas.Any())
-                        {
-                            OkinawaSankiItems.Value.Clear();
-                            var OkinawaSankiModelList = new OkinawaSankiItemList();
-                            OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas));
-                            TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                            if (OkinawaSankiDatas.Any())
+                            {
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
+                                var OkinawaSankiModelList = new OkinawaSankiItemList();
+                                var addItems = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas)).ToList();
+                                // 直接ObservableにAddするとなぜか落ちるためListをかます。
+                                var setItems = new List<OkinawaSankiItem>();
+                                addItems.ForEach(item =>
+                                {
+                                    Observable.FromEventPattern<PropertyChangedEventHandler, PropertyChangedEventArgs>(
+                                          h => item.PropertyChanged += h,
+                                          h => item.PropertyChanged -= h)
+                                          .Subscribe(e =>
+                                          {
+                                              // 発行枚数に変更があったら合計発行枚数も変更する
+                                              TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                                          });
+                                    setItems.Add(item);
+                                });
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(setItems);
+                                TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                            }
+                            else
+                            {
+                                MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
                         }
                         else
                         {
                             MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
-                    }
-                    else
-                    {
-                        MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    break;
+                        break;
+                    case 3:
+                        if (dB0118KaitukesyoList.Any() && tOKMSTPFs.Any() && wWebTorihikisakiTankaList.Any())
+                        {
+                            OkinawaSankiDatas.Clear();
+                            OkinawaSankiDatas.AddRange(
+                                dB0118KaitukesyoList.Where(x => x.NSU > 0)
+                                    .Select(kaituke => new
+                                    {
+                                        HNO = kaituke.HNO,
+                                        TOKCD = kaituke.TOKCD,
+                                        NEFUDA_KBN = "1",
+                                        CENTCD = kaituke.CENTCD,
+                                        HINBANCD = kaituke.HINBANCD,
+                                        CYUBUNCD = kaituke.CYUBUNCD,
+                                        BAIKA = kaituke.BAIKA,
+                                        SYOHINCD = kaituke.SYOHINCD,
+                                        BIKOU1 = " ",
+                                        HINCD = " ",
+                                        NSU = kaituke.NSU,
+                                    })
+                                     .GroupBy(a => new
+                                     {
+                                         a.HNO,
+                                         a.TOKCD,
+                                         a.NEFUDA_KBN,
+                                         a.CENTCD,
+                                         a.HINBANCD,
+                                         a.CYUBUNCD,
+                                         a.BAIKA,
+                                         a.SYOHINCD,
+                                         a.BIKOU1,
+                                         a.HINCD,
+                                     })
+                                     .Select(g => new OkinawaSankiData
+                                     {
+                                         HNO = g.Key.HNO,
+                                         TOKCD = g.Key.TOKCD,
+                                         NEFUDA_KBN = g.Key.NEFUDA_KBN,
+                                         JIISYA = tOKMSTPFs.FirstOrDefault()?.JISYA ?? "",
+                                         EOS = " ",
+                                         CENTCD = g.Key.CENTCD,
+                                         HINBANCD = g.Key.HINBANCD,
+                                         CYUBUNCD = g.Key.CYUBUNCD,
+                                         BAIKA = g.Key.BAIKA,
+                                         SYOHINCD = g.Key.SYOHINCD,
+                                         BIKOU1 = g.Key.BIKOU1,
+                                         HINCD = g.Key.HINCD,
+                                         NSU = g.Sum(y => y.NSU),
+                                     })
+                                     .Where(x => x.NSU > 0 &&
+                                                 x.NEFUDA_KBN == this.NefudaBangouText.Value.ToString() &&
+                                                 (!string.IsNullOrEmpty(CenterText.Value) && CenterText.Value != "99" ?
+                                                    x.CENTCD == selectCenter : true) &&
+                                                 (!string.IsNullOrEmpty(HinbanCodeText.Value) ?
+                                                    x.HINBANCD == HinbanCodeText.Value : true))
+                                     .OrderBy(g => g.HNO)
+                                     .ThenBy(g => g.SYOHINCD)
+                                 );
+
+                            if (OkinawaSankiDatas.Any())
+                            {
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>();
+                                var OkinawaSankiModelList = new OkinawaSankiItemList();
+                                var addItems = new ObservableCollection<OkinawaSankiItem>(OkinawaSankiModelList.ConvertOkinawaSankiDataToModel(OkinawaSankiDatas)).ToList();
+                                // 直接ObservableにAddするとなぜか落ちるためListをかます。
+                                var setItems = new List<OkinawaSankiItem>();
+                                addItems.ForEach(item =>
+                                {
+                                    Observable.FromEventPattern<PropertyChangedEventHandler, PropertyChangedEventArgs>(
+                                          h => item.PropertyChanged += h,
+                                          h => item.PropertyChanged -= h)
+                                          .Subscribe(e =>
+                                          {
+                                              // 発行枚数に変更があったら合計発行枚数も変更する
+                                              TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                                          });
+                                    setItems.Add(item);
+                                });
+                                OkinawaSankiItems.Value = new ObservableCollection<OkinawaSankiItem>(setItems);
+                                TotalMaisu.Value = OkinawaSankiItems.Value.Sum(x => x.発行枚数).ToString();
+                            }
+                            else
+                            {
+                                MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show("発注データが見つかりません。", "システムエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        break;
+                }                
+            });
+            //バックグラウンド処理が終わるまで表示して待つ
+            ps.ShowDialog();
+
+            if (ps.complete)
+            {
+                //処理が成功した
             }
-            this.HakkouTypeTextBox.Focus();
+            else
+            {
+                //処理が失敗した
+            }
         }
 
         /// <summary>
@@ -945,7 +1018,25 @@ namespace PriceTagPrint.ViewModel
         private void CsvExport(string fullName)
         {
             var list = OkinawaSankiItems.Value.Where(x => x.発行枚数 > 0).OrderBy(x => x.JANフリー).ToList();
-            var datas = DataUtility.ToDataTable(list);
+            var csvColSort = new string[]
+            {
+                "発注No",
+                "取引先CD",
+                "値札No",
+                "EOS",
+                "業者コード",
+                "部門",
+                "EOSコード2桁",
+                "EOS5",
+                "販売価格",
+                "JANフリー",
+                "メッセージ",
+                "サイズ",
+                "カラー",
+                "商品コード",
+                "発行枚数"
+            };
+            var datas = DataUtility.ToDataTable(list, csvColSort);
             // 不要なカラムの削除
             datas.Columns.Remove("センター");
             new CsvUtility().Write(datas, fullName, true);
@@ -981,23 +1072,45 @@ namespace PriceTagPrint.ViewModel
     /// データグリッド表示プロパティ
     /// CSVの出力にも流用
     /// </summary>
-    public class OkinawaSankiItem
+    public class OkinawaSankiItem : INotifyPropertyChanged
     {
-        public int 発注No { get; set; }
-        public string 取引先CD { get; set; }
-        public string 値札No { get; set; }
-        public string EOS { get; set; }
-        public string 業者コード { get; set; }
-        public string 部門 { get; set; }
-        public string EOSコード2桁 { get; set; }
-        public string EOS5 { get; set; }
-        public int 販売価格 { get; set; }
-        public string JANフリー { get; set; }
-        public string メッセージ { get; set; }
-        public string サイズ { get; set; }
-        public string カラー { get; set; }
-        public string 商品コード { get; set; }
-        public int 発行枚数 { get; set; }
+        public event PropertyChangedEventHandler PropertyChanged;
+        private void OnPropertyChanged(String propertyName = "")
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+        
+        public int 発注No { get; set; }   //CSV
+        public string 取引先CD { get; set; }   //CSV
+        public string 値札No { get; set; }   //CSV
+        public string EOS { get; set; }   //CSV
+        public string 業者コード { get; set; }   //CSV
+        public string 部門 { get; set; }   //CSV
+        public string EOSコード2桁 { get; set; }   //CSV
+        public string EOS5 { get; set; }   //CSV
+        public int 販売価格 { get; set; }   //CSV
+        public string JANフリー { get; set; }   //CSV
+        public string メッセージ { get; set; }   //CSV
+        public string サイズ { get; set; }   //CSV
+        public string カラー { get; set; }   //CSV
+        public string 商品コード { get; set; }   //CSV
+
+        private int _発行枚数;
+        public int 発行枚数   //CSV
+        {
+            get { return _発行枚数; }
+            set
+            {
+                if (value != this._発行枚数)
+                {
+                    this._発行枚数 = value;
+                    this.OnPropertyChanged("発行枚数");
+                }
+            }
+        }
         public string センター { get; set; }
 
         public OkinawaSankiItem(int 発注No, string 取引先CD, string 値札No, string EOS, string 業者コード, string 部門,

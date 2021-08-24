@@ -30,7 +30,7 @@ namespace PriceTagPrint.WAGO
     {
         public List<TOKMSTPF> QueryWhereTcodeTenpo(int tcode, int tenpo = 9999)
         {
-            var sql = "SELECT * " + Environment.NewLine;
+            var sql = "SELECT TCODE, TENPO, TNAMEN, RYAKU, JISYA " + Environment.NewLine;
             sql += "FROM " + Environment.NewLine;
             sql += " WAGO.TOKMSTPF " + Environment.NewLine;
             sql += "WHERE " + Environment.NewLine;
@@ -39,9 +39,10 @@ namespace PriceTagPrint.WAGO
 
             DataTable orcDt = new DataTable();
             var results = new List<TOKMSTPF>();
+            var connectString = DBConnect.OrclConnectString + DBConnect.OrclDataSource;
             try
             {
-                using (OracleConnection orcConn = new OracleConnection(DBConnect.OrclConnectString))
+                using (OracleConnection orcConn = new OracleConnection(connectString))
                 {
                     orcConn.Open();
 

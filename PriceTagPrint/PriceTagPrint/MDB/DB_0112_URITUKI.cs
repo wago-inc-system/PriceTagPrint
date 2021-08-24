@@ -33,7 +33,11 @@ namespace PriceTagPrint.MDB
         public List<DB_0112_URITUKI> dB_0112_URITUKIs = new List<DB_0112_URITUKI>();
         public DB_0112_URITUKI_LIST()
         {
-            SelectQueryByNendo(2016);
+            SelectQueryByNendo(DateTime.Today.Year);
+        }
+        public DB_0112_URITUKI_LIST(int nendo)
+        {
+            SelectQueryByNendo(nendo);
         }
         private void SelectQueryByNendo(int nendo)
         {
@@ -54,22 +58,26 @@ namespace PriceTagPrint.MDB
             // 読み込み
             try
             {
-                using (OdbcConnection mdbConn = new OdbcConnection(DBConnect.MdbConnectionString))
-                {
-                    mdbConn.Open();
+                OdbcConnection mdbConn = new OdbcConnection(DBConnect.MdbConnectionString);
 
-                    OdbcDataAdapter adapter = new OdbcDataAdapter(strSQL, mdbConn);
-                    adapter.Fill(mdbDt);
-                    foreach (DataRow dr in mdbDt.Rows)
-                    {
-                        dB_0112_URITUKIs.Add(new DB_0112_URITUKI
-                            (
-                                dr.Field<string>("SKBN"), 
-                                dr.Field<decimal>("NENDO"), 
-                                dr.Field<decimal>("TUKI"),
-                                dr.Field<decimal>("URITUKI")
-                            ));
-                    }
+                OdbcCommand sqlCommand = new OdbcCommand(strSQL, mdbConn);
+                sqlCommand.CommandTimeout = 30;
+
+                OdbcDataAdapter adapter = new OdbcDataAdapter(sqlCommand);
+
+                adapter.Fill(mdbDt);
+                adapter.Dispose();
+                sqlCommand.Dispose();
+
+                foreach (DataRow dr in mdbDt.Rows)
+                {
+                    dB_0112_URITUKIs.Add(new DB_0112_URITUKI
+                        (
+                            dr.Field<string>("SKBN"),
+                            dr.Field<decimal>("NENDO"),
+                            dr.Field<decimal>("TUKI"),
+                            dr.Field<decimal>("URITUKI")
+                        ));
                 }
             }
             catch (Exception ex)
@@ -98,8 +106,8 @@ namespace PriceTagPrint.MDB
             {
                 return wk_TUKI.ToString("00");                           // ※売切月＝納品月
             }
-
-            var dB_0112_URITUKI = dB_0112_URITUKIs.FirstOrDefault(x => x.NENDO == 2016 && x.TUKI == wk_TUKI);
+            decimal cnvNendo = decimal.TryParse(wk_NENDO.ToString(), out cnvNendo) ? cnvNendo : 0;
+            var dB_0112_URITUKI = dB_0112_URITUKIs.FirstOrDefault(x => x.NENDO == cnvNendo && x.TUKI == wk_TUKI);
 
             if(dB_0112_URITUKI == null)
             {

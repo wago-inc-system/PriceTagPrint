@@ -24,7 +24,7 @@ namespace PriceTagPrint.WAG_USR1
     {
         public List<EOSKNMTA> QueryWhereTcode(int tcode)
         {
-            var sql = "SELECT * " + Environment.NewLine;
+            var sql = "SELECT VRYOHNNM, VRYOHNCD " + Environment.NewLine;
             sql += "FROM " + Environment.NewLine;
             sql += " WAG_USR1.EOSKNMTA " + Environment.NewLine;
             sql += "WHERE " + Environment.NewLine;
@@ -32,9 +32,10 @@ namespace PriceTagPrint.WAG_USR1
 
             DataTable orcDt = new DataTable();
             var results = new List<EOSKNMTA>();
+            var connectString = DBConnect.OrclConnectString + DBConnect.OrclDataSource;
             try
             {
-                using (OracleConnection orcConn = new OracleConnection(DBConnect.OrclConnectString))
+                using (OracleConnection orcConn = new OracleConnection(connectString))
                 {
                     orcConn.Open();
 
